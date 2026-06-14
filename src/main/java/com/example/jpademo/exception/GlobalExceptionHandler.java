@@ -1,4 +1,4 @@
-package com.example.artistsongs.exception;
+package com.example.jpademo.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,30 +1,39 @@
--- Artists
-INSERT INTO artist (id, name, nationality, genre, debut_year) VALUES
-  (1, 'Taylor Swift',   'American', 'Pop/Country', 2006),
-  (2, 'Ed Sheeran',     'British',  'Pop',         2011),
-  (3, 'The Weeknd',     'Canadian', 'R&B',         2010);
+-- ================================================================
+-- TODO (Step 3): Replace with seed data that matches your domain.
+-- Table names match the @Table(name=...) annotations in the entities.
+-- Column names match entity field names (Hibernate snake_case conversion):
+--   entryYear  -> entry_year
+--   dataValue  -> data_value
+--   category   -> category
+-- ================================================================
 
--- Songs (each belongs to one artist — one-to-many)
-INSERT INTO song (id, title, release_year, artist_id) VALUES
-  (1,  'Love Story',       2008, 1),
-  (2,  'Shake It Off',     2014, 1),
-  (3,  'Anti-Hero',        2022, 1),
-  (4,  'Shape of You',     2017, 2),
-  (5,  'Perfect',          2017, 2),
-  (6,  'Blinding Lights',  2019, 3),
-  (7,  'Starboy',          2016, 3);
+-- Parent records (one Parent has many Children)
+INSERT INTO parent (id, name, category, description, entry_year) VALUES
+  (1, 'Parent One',   'Type A', 'First parent record',  2010),
+  (2, 'Parent Two',   'Type B', 'Second parent record', 2015),
+  (3, 'Parent Three', 'Type A', 'Third parent record',  2020);
 
--- Song details (one-to-one with song)
-INSERT INTO song_detail (id, song_id, album, duration_seconds, genre, lyrics_snippet) VALUES
-  (1, 1,  'Fearless',           235, 'Country Pop', 'We were both young when I first saw you'),
-  (2, 2,  '1989',               219, 'Synth-pop',   'I stay out too late, got nothing in my brain'),
-  (3, 3,  'Midnights',          200, 'Indie Pop',   'I have this thing where I get older but just never wiser'),
-  (4, 4,  'Divide',             234, 'Pop',         'The club isn''t the best place to find a lover'),
-  (5, 5,  'Divide',             263, 'Pop Ballad',  'I found a love for me, darling just dive right in'),
-  (6, 6,  'After Hours',        200, 'Synth-pop',   'I said, ooh, I''m blinded by the lights'),
-  (7, 7,  'Starboy',            230, 'R&B',         'I''m tryna put you in the worst mood, ah');
+-- Child records (each belongs to one Parent — one-to-many)
+INSERT INTO child (id, name, data_value, entry_year, parent_id) VALUES
+  (1, 'Child 1-A', 'value-1a', 2011, 1),
+  (2, 'Child 1-B', 'value-1b', 2012, 1),
+  (3, 'Child 1-C', 'value-1c', 2013, 1),
+  (4, 'Child 2-A', 'value-2a', 2016, 2),
+  (5, 'Child 2-B', 'value-2b', 2017, 2),
+  (6, 'Child 3-A', 'value-3a', 2021, 3),
+  (7, 'Child 3-B', 'value-3b', 2022, 3);
+
+-- ChildDetail records (one-to-one with Child)
+INSERT INTO child_detail (id, child_id, description, additional_info, numeric_value, notes) VALUES
+  (1, 1, 'Detail for Child 1-A', 'Extra info A', 100, 'Note A'),
+  (2, 2, 'Detail for Child 1-B', 'Extra info B', 200, 'Note B'),
+  (3, 3, 'Detail for Child 1-C', 'Extra info C', 300, 'Note C'),
+  (4, 4, 'Detail for Child 2-A', 'Extra info D', 400, 'Note D'),
+  (5, 5, 'Detail for Child 2-B', 'Extra info E', 500, 'Note E'),
+  (6, 6, 'Detail for Child 3-A', 'Extra info F', 600, 'Note F'),
+  (7, 7, 'Detail for Child 3-B', 'Extra info G', 700, 'Note G');
 
 -- Advance identity sequences past the seed data so auto-generated IDs don't collide
-ALTER TABLE artist    ALTER COLUMN id RESTART WITH 100;
-ALTER TABLE song      ALTER COLUMN id RESTART WITH 100;
-ALTER TABLE song_detail ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE parent       ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE child        ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE child_detail ALTER COLUMN id RESTART WITH 100;

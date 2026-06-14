@@ -1,42 +1,68 @@
-# Spring Boot JPA Relationships Template
+# Spring Boot JPA Inheritance Template (SINGLE_TABLE)
 
-A ready-to-use Spring Boot template demonstrating **one-to-many** and **one-to-one** JPA relationships. Clone, rename the generic `Parent` / `Child` / `ChildDetail` classes to your domain, and you have a working CRUD REST API backed by JPA.
+A minimal Spring Boot template demonstrating **JPA Inheritance** using the `SINGLE_TABLE` strategy. Two concrete subtypes (`ItemTypeA`, `ItemTypeB`) extend an abstract base (`Item`). All rows share one database table; a discriminator column identifies the Java subtype.
+
+> Need inheritance **combined with one-to-many**? See the `inheritance-onetomany/` project on branch `claude/spring-boot-inheritance-onetomany`.
 
 ---
 
-## Relationship Overview
+## Inheritance Strategy Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    RELATIONSHIP DIAGRAM                         │
+│              SINGLE_TABLE INHERITANCE                           │
 │                                                                 │
-│   ┌──────────┐  ONE-TO-MANY   ┌──────────┐                     │
-│   │  Parent  │ ─────────────► │  Child   │                     │
-│   │(1 parent)│  (1 has many)  │(N childn)│                     │
-│   └──────────┘                └──────────┘                     │
-│                                     │  ONE-TO-ONE              │
-│                                     ▼                          │
-│                               ┌─────────────┐                  │
-│                               │ ChildDetail │                  │
-│                               └─────────────┘                  │
+│   ┌──────────────────────────┐                                  │
+│   │  Item  (abstract base)   │  @Inheritance(SINGLE_TABLE)      │
+│   │  - id                    │  @DiscriminatorColumn("item_type")│
+│   │  - name                  │                                  │
+│   │  - description           │                                  │
+│   │  - entryYear             │                                  │
+│   └────────────┬─────────────┘                                  │
+│                │                                                │
+│       ┌────────┴────────┐                                       │
+│       ▼                 ▼                                       │
+│  ┌──────────┐      ┌──────────┐                                 │
+│  │ItemTypeA │      │ItemTypeB │                                 │
+│  │ TYPE_A   │      │ TYPE_B   │  <- discriminator values        │
+│  │extraFieldA│     │extraFieldB│                                │
+│  └──────────┘      │numericField│                               │
+│                    └──────────┘                                 │
 │                                                                 │
-│  Database tables:                                               │
-│    parent       (id, name, category, description, entry_year)   │
-│    child        (id, name, data_value, entry_year, parent_id)   │
-│    child_detail (id, child_id, description, additional_info,    │
-│                  numeric_value, notes)                          │
+│  Single database table: item                                    │
+│  ┌────┬──────────┬──────┬─────────┬────────────┬───────────┐   │
+│  │ id │item_type │ name │  desc   │extra_field_a│extra_fld_b│   │
+│  ├────┼──────────┼──────┼─────────┼────────────┼───────────┤   │
+│  │  1 │ TYPE_A   │ ...  │  ...    │  alpha-1   │   NULL    │   │
+│  │  2 │ TYPE_B   │ ...  │  ...    │   NULL     │   beta-1  │   │
+│  └────┴──────────┴──────┴─────────┴────────────┴───────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### One-to-Many (Parent → Child)
-- One `Parent` row can have **many** `Child` rows.
-- The FK (`parent_id`) lives in the `child` table.
-- Deleting a `Parent` **cascades** and deletes all its `Children`.
+---
 
-### One-to-One (Child → ChildDetail)
-- Each `Child` row has **at most one** `ChildDetail` row.
-- The FK (`child_id`, unique) lives in the `child_detail` table.
-- Deleting a `Child` **cascades** and deletes its `ChildDetail`.
+## Three Inheritance Strategies
+
+| Strategy | Table layout | Pros | Cons |
+|---|---|---|---|
+| **SINGLE_TABLE** ← this project | 1 table, discriminator column | Fast (no joins) | Nullable columns for subtype fields |
+| **JOINED** | 1 base table + 1 per subtype | Normalised, no nulls | JOIN on every query |
+| **TABLE_PER_CLASS** | 1 full table per concrete class | No joins, no nulls | No shared sequence; UNION ALL for polymorphic queries |
+
+To switch strategy, change the one annotation in `Item.java`:
+```java
+// SINGLE_TABLE (current)
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "item_type")
+
+// JOINED (normalised)
+@Inheritance(strategy = InheritanceType.JOINED)
+// remove @DiscriminatorColumn — not used by JOINED
+
+// TABLE_PER_CLASS
+@Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
+// remove @DiscriminatorColumn — not used
+```
 
 ---
 
@@ -45,241 +71,140 @@ A ready-to-use Spring Boot template demonstrating **one-to-many** and **one-to-o
 ```
 src/
 └── main/
-│   ├── java/com/example/jpademo/
-│   │   ├── JpaDemoApplication.java       <- Spring Boot entry point
+│   ├── java/com/example/inheritance/
+│   │   ├── InheritanceApplication.java
 │   │   ├── entity/
-│   │   │   ├── Parent.java               <- @OneToMany owner
-│   │   │   ├── Child.java                <- @ManyToOne + @OneToOne owner
-│   │   │   └── ChildDetail.java          <- @OneToOne detail (FK side)
+│   │   │   ├── Item.java           <- abstract @Entity, SINGLE_TABLE
+│   │   │   ├── ItemTypeA.java      <- @DiscriminatorValue("TYPE_A")
+│   │   │   └── ItemTypeB.java      <- @DiscriminatorValue("TYPE_B")
 │   │   ├── dto/
-│   │   │   ├── ParentDto.java
-│   │   │   ├── ChildDto.java
-│   │   │   ├── ChildDetailDto.java
-│   │   │   ├── CreateParentRequest.java
-│   │   │   └── CreateChildRequest.java
+│   │   │   ├── ItemDto.java        <- flat DTO with all subtype fields
+│   │   │   ├── CreateItemTypeARequest.java
+│   │   │   └── CreateItemTypeBRequest.java
 │   │   ├── repository/
-│   │   │   ├── ParentRepository.java
-│   │   │   ├── ChildRepository.java
-│   │   │   └── ChildDetailRepository.java
+│   │   │   └── ItemRepository.java <- JpaRepository<Item, Long>
 │   │   ├── service/
-│   │   │   ├── ParentService.java
-│   │   │   └── ChildService.java
+│   │   │   └── ItemService.java
 │   │   ├── controller/
-│   │   │   ├── ParentController.java     <- GET/POST/PUT/DELETE /api/parents
-│   │   │   └── ChildController.java      <- GET/POST/PUT/DELETE /api/children
+│   │   │   └── ItemController.java
 │   │   └── exception/
-│   │       ├── ResourceNotFoundException.java
-│   │       └── GlobalExceptionHandler.java
 │   └── resources/
-│       ├── application.properties        <- H2 config
-│       └── data.sql                      <- seed data
+│       ├── application.properties
+│       └── data.sql                <- 3 TypeA + 3 TypeB seed rows
 └── test/
-    └── java/com/example/jpademo/
-        └── JpaDemoApplicationTests.java  <- 7 integration tests
+    └── java/com/example/inheritance/
+        └── InheritanceApplicationTests.java  <- 11 tests
 ```
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-- Java 17+
-- Maven 3.8+
-
-### Run
 ```bash
-mvn spring-boot:run
-```
-
-### Test
-```bash
+mvn spring-boot:run   # http://localhost:8080
 mvn test
 ```
 
-The app starts on **http://localhost:8080**.
-H2 console: **http://localhost:8080/h2-console**
-- JDBC URL: `jdbc:h2:mem:jpademo`
-- User: `sa`
-- Password: _(empty)_
+H2 console: **http://localhost:8080/h2-console** (URL: `jdbc:h2:mem:inheritancedb`, user: `sa`)
 
 ---
 
 ## REST API Reference
 
-### Parents (one-to-many side)
-
 | Method | URL | Description |
 |--------|-----|-------------|
-| GET | `/api/parents` | List all parents with their children |
-| GET | `/api/parents/{id}` | Get one parent with its children |
-| POST | `/api/parents` | Create a parent |
-| PUT | `/api/parents/{id}` | Update a parent |
-| DELETE | `/api/parents/{id}` | Delete a parent (cascades to children) |
-
-### Children
-
-| Method | URL | Description |
-|--------|-----|-------------|
-| GET | `/api/children` | List all children |
-| GET | `/api/children/{id}` | Get one child with its detail |
-| GET | `/api/children?parentId={id}` | All children of a parent |
-| POST | `/api/children` | Create a child (linked to a parent) |
-| PUT | `/api/children/{id}/detail` | Add or replace the one-to-one detail |
-| DELETE | `/api/children/{id}` | Delete a child (cascades to detail) |
-
-### Example cURL commands
+| GET | `/api/items` | All items (mixed TypeA + TypeB) |
+| GET | `/api/items/{id}` | One item — response shows correct subtype |
+| GET | `/api/items?subtype=TYPE_A` | Filter to TypeA only |
+| GET | `/api/items?subtype=TYPE_B` | Filter to TypeB only |
+| POST | `/api/items/type-a` | Create a TypeA item |
+| POST | `/api/items/type-b` | Create a TypeB item |
+| DELETE | `/api/items/{id}` | Delete any item |
 
 ```bash
-# List all parents (with their children)
-curl http://localhost:8080/api/parents
+# All items (mixed)
+curl http://localhost:8080/api/items
 
-# Get one parent
-curl http://localhost:8080/api/parents/1
+# TypeA items only
+curl "http://localhost:8080/api/items?subtype=TYPE_A"
 
-# Create a parent
-curl -X POST http://localhost:8080/api/parents \
+# Create TypeA
+curl -X POST http://localhost:8080/api/items/type-a \
   -H "Content-Type: application/json" \
-  -d '{"name":"New Parent","category":"Type X","description":"Desc","entryYear":2024}'
+  -d '{"name":"My A","description":"desc","entryYear":2024,"extraFieldA":"val-a"}'
 
-# Create a child linked to parent 1
-curl -X POST http://localhost:8080/api/children \
+# Create TypeB
+curl -X POST http://localhost:8080/api/items/type-b \
   -H "Content-Type: application/json" \
-  -d '{"name":"New Child","dataValue":"abc","entryYear":2024,"parentId":1}'
-
-# Add one-to-one detail to child 1
-curl -X PUT http://localhost:8080/api/children/1/detail \
-  -H "Content-Type: application/json" \
-  -d '{"description":"My detail","additionalInfo":"Extra","numericValue":42,"notes":"Note"}'
-
-# Get children of parent 1
-curl "http://localhost:8080/api/children?parentId=1"
-
-# Delete a parent (and all its children)
-curl -X DELETE http://localhost:8080/api/parents/1
+  -d '{"name":"My B","description":"desc","entryYear":2024,"extraFieldB":"val-b","numericField":42}'
 ```
 
 ---
 
-## How to Adapt This Template for Your Exam
+## How to Adapt for Your Exam
 
-Follow these steps in order. Search-and-replace is your friend — most IDEs let you rename a class across all files at once (Refactor > Rename).
+### Step 1 — Rename `Item.java` (the base)
+Replace with your abstract base type (e.g. `Vehicle`, `Payment`, `Employee`):
+- Class name, table name
+- Fields: `name`, `description`, `entryYear` → your domain fields
+- **Do NOT add a `@Column` mapping for the discriminator column** — Hibernate manages it
 
-### Step 1 — Rename the project (`pom.xml`)
-Change `artifactId`, `name`, and `description` to match your project.
+### Step 2 — Rename `ItemTypeA.java`
+Replace with your first concrete subtype (e.g. `Car`, `CreditCard`, `Manager`):
+- Class name, `@DiscriminatorValue("TYPE_A")` → `@DiscriminatorValue("CAR")`
+- Fields: `extraFieldA` → your subtype-specific fields
+- Keep `@Column(name = "extra_field_a")` pattern for fields ending in a single capital letter
 
-### Step 2 — Rename the application name (`application.properties`)
-Change `spring.application.name` to match your project.
+### Step 3 — Rename `ItemTypeB.java`
+Same pattern for your second concrete subtype (e.g. `Truck`, `BankTransfer`, `Employee`).
 
-### Step 3 — Update seed data (`data.sql`)
-Replace the `INSERT` statements with data relevant to your domain.
-Keep the `ALTER TABLE ... RESTART WITH 100` lines to avoid ID collisions in tests.
+### Step 4 — Update `ItemDto`
+Add/remove fields to match. The `itemType` field is the discriminator returned to clients.
 
-### Step 4 — Rename entities
-
-#### 4a — `Parent.java` → your "one" side entity
-Example: domain is **Artist -> Songs**, rename to `Artist.java`:
-- Class name: `Artist`
-- Table: `@Table(name = "artist")`
-- Fields: replace `name`, `category`, `description`, `entryYear` with artist-specific fields
-  e.g. `artistName`, `nationality`, `genre`, `debutYear`
-- Collection field: rename `children` -> `songs`; rename helpers `addChild`/`removeChild` -> `addSong`/`removeSong`
-
-#### 4b — `Child.java` → your "many" side entity
-Example: `Song.java`
-- Class name: `Song`
-- Table: `@Table(name = "song")`
-- Fields: replace `name`, `dataValue`, `entryYear` with song fields
-  e.g. `title`, `durationSeconds`, `releaseYear`
-- FK field: rename `parent` -> `artist`
-
-#### 4c — `ChildDetail.java` → your detail entity
-Example: `SongDetail.java`
-- Class name: `SongDetail`
-- Table: `@Table(name = "song_detail")`
-- Fields: replace `description`, `additionalInfo`, `numericValue`, `notes` with detail fields
-  e.g. `album`, `lyricsSnippet`, `durationSeconds`, `genre`
-- FK field: rename `child` -> `song`
-
-> **Reserved SQL keywords — do NOT use as column names:**
-> `year`, `value`, `type`, `order`, `group`, `key`, `select`, `where`, `from`
-> Use prefixed alternatives like `entry_year`, `data_value`, `record_type` instead.
-
-### Step 5 — Rename DTOs
-Rename all DTO classes and update fields to match your renamed entities:
-
-| Old name | New name (example) |
-|---|---|
-| `ParentDto` | `ArtistDto` |
-| `ChildDto` | `SongDto` |
-| `ChildDetailDto` | `SongDetailDto` |
-| `CreateParentRequest` | `CreateArtistRequest` |
-| `CreateChildRequest` | `CreateSongRequest` |
-
-### Step 6 — Rename Repositories
-| Old name | New name (example) |
-|---|---|
-| `ParentRepository` | `ArtistRepository` |
-| `ChildRepository` | `SongRepository` |
-| `ChildDetailRepository` | `SongDetailRepository` |
-
-Update any `findByCategory` / `findByParentId` method names to match your fields.
-
-### Step 7 — Rename Services
-| Old name | New name (example) |
-|---|---|
-| `ParentService` | `ArtistService` |
-| `ChildService` | `SongService` |
-
-Update all field references in the mapping helpers (`toDto`, `toChildDto`, etc.).
-
-### Step 8 — Rename Controllers
-| Old name | New name (example) |
-|---|---|
-| `ParentController` | `ArtistController` |
-| `ChildController` | `SongController` |
-
-Change `@RequestMapping`:
-- `/api/parents` -> `/api/artists`
-- `/api/children` -> `/api/songs`
-
-### Step 9 — Update Tests (`JpaDemoApplicationTests.java`)
-Rename the test class and update all assertions to use your new entity names and seed data values.
-
-### Step 10 — Verify everything
-```bash
-mvn clean test
+### Step 5 — Update `ItemService.toDto()`
+The `instanceof` block is the key — update it for your renamed subtypes:
+```java
+if (item instanceof Car car) {
+    builder.itemType("CAR").numDoors(car.getNumDoors());
+} else if (item instanceof Truck truck) {
+    builder.itemType("TRUCK").payloadTons(truck.getPayloadTons());
+}
 ```
-All tests should pass. If they fail, the error message points to the mismatched field.
+
+### Step 6 — Update `ItemRepository`, controller, and tests
+### Step 7 — Run `mvn clean test`
 
 ---
 
-## Key JPA Annotations Explained
+## Key Annotations
 
-| Annotation | Where used | What it does |
-|---|---|---|
-| `@OneToMany(mappedBy="parent", cascade=ALL, orphanRemoval=true)` | Parent | Declares one-to-many. `mappedBy` points to the FK field in Child. `cascade=ALL` propagates save/delete. `orphanRemoval=true` deletes children removed from the list. |
-| `@ManyToOne` + `@JoinColumn(name="parent_id")` | Child | Many-to-one back-reference. Places the FK column in the child table. This is the **owning** side of the relationship. |
-| `@OneToOne(mappedBy="child", cascade=ALL, orphanRemoval=true)` | Child | Declares one-to-one (inverse side). No FK column here. |
-| `@OneToOne` + `@JoinColumn(name="child_id", unique=true)` | ChildDetail | One-to-one (owning / FK side). Places the FK column in this table. `unique=true` enforces the constraint at DB level. |
-| `@EntityGraph(attributePaths="children")` | Repository | Fetches the named collection in the same SQL query, preventing N+1 problems with lazy loading. |
-| `fetch = FetchType.LAZY` | All relations | Relations are only loaded when accessed. Avoids unnecessary DB queries. |
+```java
+// Abstract base — declares the strategy and discriminator column
+@Entity
+@Table(name = "item")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "item_type", discriminatorType = DiscriminatorType.STRING)
+public abstract class Item { ... }
 
----
+// Concrete subtype — declares its discriminator value
+@Entity
+@DiscriminatorValue("TYPE_A")
+public class ItemTypeA extends Item {
+    @Column(name = "extra_field_a")   // explicit name avoids Hibernate naming edge case
+    private String extraFieldA;
+}
 
-## Common Pitfalls
+// Repository — works polymorphically with all subtypes
+public interface ItemRepository extends JpaRepository<Item, Long> {
+    @Query("SELECT a FROM ItemTypeA a")
+    List<ItemTypeA> findAllTypeA();   // Hibernate adds WHERE item_type = 'TYPE_A'
+}
+```
 
-**1. Bidirectional sync**
-Always use `parent.addChild(child)` (the helper method), not just `child.setParent(parent)`.
-The helper method updates both sides of the relationship in memory so queries within the same transaction return correct data.
+## Important Notes
 
-**2. Cascade delete with lazy collections**
-The `delete()` service method loads children *eagerly* before deleting the parent.
-Without this, Hibernate skips the cascade and the DB throws a FK constraint violation.
+1. **Do NOT map the discriminator column as a `@Column` field** in the abstract class. This prevents Hibernate from adding subtype columns to the DDL.
 
-**3. Reserved SQL keywords as column names**
-Avoid `year`, `value`, `type`, `order`, `key` as field/column names.
-Hibernate generates DDL using them unquoted, which H2 (and other DBs) reject as syntax errors.
+2. **Use `@Column(name=...)` for fields ending in a single capital letter** (e.g. `extraFieldA`). Hibernate converts it to `extra_fielda`, not `extra_field_a`.
 
-**4. ID sequence collision in tests**
-When `data.sql` inserts rows with explicit IDs (1, 2, 3...), the auto-increment sequence does not advance automatically.
-Fix: add `ALTER TABLE ... ALTER COLUMN id RESTART WITH 100` at the end of `data.sql`.
+3. **Use `instanceof` pattern matching** in the service to access subtype-specific fields safely.
